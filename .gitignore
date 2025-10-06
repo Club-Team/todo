@@ -1,0 +1,29 @@
+# === Backend ===
+/backend/.fleet
+/backend/Todo.Api/bin/
+/backend/Todo.Api/obj/
+
+# === .NET general ignores ===
+**/bin/
+**/obj/
+**/out/
+**/Debug/
+**/Release/
+*.user
+*.suo
+*.userprefs
+*.csproj.user
+*.vscode/
+
+# === OS / IDE files ===
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.tmp
+*.log
+
+# === Environment ===
+.env
+.env.*
