@@ -1,16 +1,22 @@
 import 'package:flutter/material.dart';
+import 'pages/todo_list_page.dart';
 
-void main() => runApp(const MyApp());
+void main() {
+  runApp(const TodoApp());
+}
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class TodoApp extends StatelessWidget {
+  const TodoApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(child: Text('Hello World!')),
+    return MaterialApp(
+      title: 'Todo App',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        useMaterial3: true,
       ),
+      home: const TodoListPage(),
     );
   }
 }

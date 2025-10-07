@@ -15,6 +15,16 @@ builder.Services.AddSwaggerGen(options =>
         Description = "A simple CRUD Todo API built with ASP.NET Core 8 and PostgreSQL"
     });
 });
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 // Database (PostgreSQL)
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -43,5 +53,6 @@ app.UseSwaggerUI(options =>
 app.UseHttpsRedirection();
 
 app.MapControllers();
+app.UseCors();
 
 app.Run();
