@@ -1,0 +1,82 @@
+# Flutter / Dart / Android / iOS / macOS / Web / Linux / Windows ignores
+
+# Flutter/Dart specific
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+.generated/
+pubspec.lock
+
+# Build outputs
+build/
+ios/Flutter/Flutter.framework/
+ios/Flutter/Flutter.podspec
+ios/Flutter/Generated.xcconfig
+ios/Flutter/App.framework
+macos/Flutter/Flutter-Debug.xcconfig
+macos/Flutter/Flutter-Release.xcconfig
+
+# Android specific
+android/.gradle/
+android/local.properties
+android/app/build/
+android/.idea/
+
+# iOS specific
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/RunnerTests/
+ios/Flutter/ephemeral/
+ios/.symlinks/
+ios/.generated/
+*.xcuserstate
+*.xcworkspace/
+*.xcuserdatad/
+DerivedData/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+
+# macOS specific
+macos/Flutter/ephemeral/
+macos/Runner.xcworkspace/
+macos/RunnerTests/
+*.xcuserstate
+*.xcworkspace/
+*.xcuserdatad/
+DerivedData/
+
+# Linux specific
+linux/flutter/ephemeral/
+
+# Windows specific
+windows/flutter/ephemeral/
+windows/runner/Debug/
+windows/runner/Release/
+
+# Web specific
+web/.dart_tool/
+
+# IDE/editor files
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# Misc
+*.log
+*.tmp
+*.DS_Store
+*.lock
+*.bak
+
+# Ignore coverage and test artifacts
+coverage/
+test/output/
+
+# Firebase / secrets (if added later)
+*.env
+google-services.json
+GoogleService-Info.plist
