@@ -1,12 +1,21 @@
-name: Simple Test
+name: dotnet package
 
-on:
-  push:
-  pull_request:
+on: [push]
 
 jobs:
-  test:
+  build:
+
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        dotnet-version: [ '8.0.x' ]
+
     steps:
-      - name: Run test
-        run: echo "test"
+      - uses: actions/checkout@v5
+      - name: Setup dotnet ${{ matrix.dotnet-version }}
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ matrix.dotnet-version }}
+      # You can test your matrix by printing the current dotnet version
+      - name: Display dotnet version
+        run: dotnet --version
