@@ -1,21 +1,25 @@
-name: dotnet package
-
 on: [push]
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        dotnet-version: [ '8.0.x' ]
+        dotnet-version: ['8.0.x']
 
     steps:
       - uses: actions/checkout@v5
-      - name: Setup dotnet ${{ matrix.dotnet-version }}
+
+      - name: Setup .NET ${{ matrix.dotnet-version }}
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ matrix.dotnet-version }}
-      # You can test your matrix by printing the current dotnet version
-      - name: Display dotnet version
-        run: dotnet --version
+
+      - name: Confirm SDK and runtime versions
+        run: |
+          echo "SDK version:"
+          dotnet --version
+          echo "Installed SDKs:"
+          dotnet --list-sdks
+          echo "Installed runtimes:"
+          dotnet --list-runtimes
