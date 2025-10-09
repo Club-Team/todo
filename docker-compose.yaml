@@ -10,6 +10,11 @@ services:
     depends_on:
       - db
 
+  front:
+    image: afshinap/todo-frontend
+    ports:
+      - "3000:3000"
+
   db:
     image: postgres:16
     environment:
