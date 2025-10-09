@@ -1,7 +1,33 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.EntityFrameworkCore;
 using Todo.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddHttpClient();
+
+var useFakeAuth = builder.Configuration.GetValue<bool>("UseFakeAuth");
+
+if (!useFakeAuth)
+{
+    builder.Services
+        .AddAuthentication("Bearer")
+        .AddJwtBearer("Bearer", options =>
+        {
+            options.Authority = builder.Configuration["Keycloak:Authority"];
+            options.Audience = builder.Configuration["Keycloak:ClientId"];
+            options.RequireHttpsMetadata = false;
+        });
+}
+else
+{
+    // Add fake auth
+    builder.Services.AddAuthentication("Fake")
+        .AddScheme<AuthenticationSchemeOptions, FakeAuthHandler>("Fake", null);
+}
+
+builder.Services.AddAuthorization();
+
 
 // Add services
 builder.Services.AddControllers();
@@ -52,7 +78,11 @@ app.UseSwaggerUI(options =>
 
 app.UseHttpsRedirection();
 
-app.MapControllers();
 app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllers();
+
 
 app.Run();

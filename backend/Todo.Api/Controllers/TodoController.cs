@@ -1,3 +1,5 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Todo.Api.Data;
@@ -7,6 +9,8 @@ namespace Todo.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // 🔒 Require JWT
+
 public class TodoController : ControllerBase
 {
     private readonly AppDbContext _context;
@@ -16,11 +20,17 @@ public class TodoController : ControllerBase
         _context = context;
     }
 
+    private string GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? 
+                                  User.FindFirstValue("sub")!; // Keycloak uses "sub"
+
+
     // GET: api/todo
     [HttpGet]
     public async Task<ActionResult<IEnumerable<TodoItem>>> GetAll()
     {
-        var todos = await _context.TodoItems.ToListAsync();
+        var userId = GetUserId();
+        var todos = await _context.TodoItems
+            .Where(t => t.UserId == userId).ToListAsync();
         return Ok(todos);
     }
 
@@ -28,18 +38,23 @@ public class TodoController : ControllerBase
     [HttpGet("{id:guid}")]
     public async Task<ActionResult<TodoItem>> GetById(Guid id)
     {
-        var todo = await _context.TodoItems.FindAsync(id);
+        var userId = GetUserId();
+        var todo = await _context.TodoItems
+            .Where(t => t.UserId == userId
+            && t.Id == id).FirstOrDefaultAsync();
         if (todo == null)
             return NotFound();
 
         return Ok(todo);
     }
 
-    // POST: api/todo
     [HttpPost]
     public async Task<ActionResult<TodoItem>> Create(TodoItem todo)
     {
+        var userId = GetUserId();
+        todo.UserId = userId;
         todo.CreatedAt = DateTimeOffset.UtcNow;
+
         _context.TodoItems.Add(todo);
         await _context.SaveChangesAsync();
 
@@ -50,7 +65,10 @@ public class TodoController : ControllerBase
     [HttpPut("{id:guid}")]
     public async Task<IActionResult> Update(Guid id, TodoItem updated)
     {
-        var todo = await _context.TodoItems.FindAsync(id);
+        var userId = GetUserId();
+        var todo = await _context.TodoItems
+            .Where(t => t.UserId == userId
+                        && t.Id == id).FirstOrDefaultAsync();
         if (todo == null)
             return NotFound();
 
@@ -67,7 +85,10 @@ public class TodoController : ControllerBase
     [HttpDelete("{id:guid}")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var todo = await _context.TodoItems.FindAsync(id);
+        var userId = GetUserId();
+        var todo = await _context.TodoItems
+            .Where(t => t.UserId == userId
+                        && t.Id == id).FirstOrDefaultAsync();
         if (todo == null)
             return NotFound();
 

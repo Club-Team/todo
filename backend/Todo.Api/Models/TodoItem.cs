@@ -1,14 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace Todo.Api.Models;
-
 public class TodoItem
 {
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    [Required]
-    [MaxLength(200)]
+    [Required, MaxLength(200)]
     public string Title { get; set; } = null!;
 
     public string? Description { get; set; }
@@ -18,4 +15,8 @@ public class TodoItem
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset? UpdatedAt { get; set; }
+
+    // Relation to user
+    [Required]
+    public string UserId { get; set; } = null!; // Keycloak `sub`
 }
