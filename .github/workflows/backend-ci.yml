@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'backend/Todo.Api/**'
 
 jobs:
   build:
@@ -17,14 +19,11 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      - name: Install xmllint
-        run: sudo apt-get update && sudo apt-get install -y libxml2-utils
-
       - name: Extract backend version from .csproj
         id: get-version
         run: |
           csproj_file=$(find backend -name '*.csproj' | head -n 1)
-          version=$(xmllint --xpath "string(//Project/PropertyGroup/Version)" $csproj_file)
+          version=$(grep -oP '(?<=<Version>).*?(?=</Version>)' "$csproj_file")
           echo "BACKEND_VERSION=$version" >> $GITHUB_ENV
 
       - name: Log in to DockerHub
