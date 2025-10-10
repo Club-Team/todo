@@ -31,10 +31,15 @@ services:
     container_name: jaeger
     ports:
       - "16686:16686"  # Jaeger UI
-      - "4317:4317"    # OTLP gRPC (used by .NET OpenTelemetry)
-      - "4318:4318"    # OTLP HTTP (optional)
+      - "4317:4317"    # OTLP gRPC
+      - "4318:4318"    # OTLP HTTP
     environment:
       - COLLECTOR_OTLP_ENABLED=true
+      - SPAN_STORAGE_TYPE=badger
+      - BADGER_DIRECTORY_VALUE=/jaeger/badger
+      - BADGER_DIRECTORY_KEY=/jaeger/badger
+    volumes:
+      - ./.containers/jaeger:/jaeger/badger
 
   # openssl req -x509 -newkey rsa:4096 -nodes -keyout certs/privkey.pem -out certs/fullchain.pem -days 365 -subj "//CN=localhost"
   keycloak:
