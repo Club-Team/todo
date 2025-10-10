@@ -26,5 +26,34 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
 
+  jaeger:
+    image: jaegertracing/all-in-one:1.60
+    container_name: jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC (used by .NET OpenTelemetry)
+      - "4318:4318"    # OTLP HTTP (optional)
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+
+  # openssl req -x509 -newkey rsa:4096 -nodes -keyout certs/privkey.pem -out certs/fullchain.pem -days 365 -subj "//CN=localhost"
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    container_name: keycloak
+    ports:
+      - "8443:8443"
+    environment:
+      KC_HTTP_ENABLED: "false"
+      KC_HTTPS_CERTIFICATE_FILE: "/etc/x509/https/tls.crt"
+      KC_HTTPS_CERTIFICATE_KEY_FILE: "/etc/x509/https/tls.key"
+      KC_HOSTNAME: "localhost"
+      KC_BOOTSTRAP_ADMIN_USERNAME: "admin"
+      KC_BOOTSTRAP_ADMIN_PASSWORD: "admin"
+    volumes:
+      - ./certs/fullchain.pem:/etc/x509/https/tls.crt:ro
+      - ./certs/privkey.pem:/etc/x509/https/tls.key:ro
+      - ./.containers/identity:/opt/keycloak/data
+    command: ["start-dev"]
+
 volumes:
   pgdata:
