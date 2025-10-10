@@ -16,4 +16,5 @@ services:
     volumes:
       - ./certs/fullchain.pem:/etc/x509/https/tls.crt:ro
       - ./certs/privkey.pem:/etc/x509/https/tls.key:ro
+      - ./.containers/identity:/opt/keycloak/data
     command: ["start-dev"]
