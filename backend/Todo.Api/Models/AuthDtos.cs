@@ -27,3 +27,10 @@ public class TokenResponse
     public int ExpiresIn { get; set; }
     public string TokenType { get; set; } = null!;
 }
+
+
+public record SendOtpDto(string Contact);    // contact = email or mobile
+public record VerifyOtpDto(string Contact, string Otp);
+public record RegisterDto(string Email, string Mobile, string Password);
+public record LoginDto(string Username, string Password);
+public record RefreshDto(string RefreshToken);

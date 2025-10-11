@@ -7,8 +7,12 @@ public class UserProfile
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
+    public string UserId { get; set; }
     [Required]
     public string KeycloakUserId { get; set; } = null!; // sub from Keycloak token
+
+    
+    public string Mobile { get; set; }
 
     [MaxLength(100)]
     public string? FirstName { get; set; }

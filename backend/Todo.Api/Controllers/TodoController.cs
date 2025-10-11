@@ -20,8 +20,7 @@ public class TodoController : ControllerBase
         _context = context;
     }
 
-    private string GetUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier) ?? 
-                                  User.FindFirstValue("sub")!; // Keycloak uses "sub"
+    private string GetUserId() => User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
 
     // GET: api/todo
@@ -49,21 +48,27 @@ public class TodoController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<ActionResult<TodoItem>> Create(TodoItem todo)
+    public async Task<ActionResult<TodoItem>> Create(CreateTodoDto todo)
     {
         var userId = GetUserId();
-        todo.UserId = userId;
-        todo.CreatedAt = DateTimeOffset.UtcNow;
-
-        _context.TodoItems.Add(todo);
+        var createTodo = new TodoItem()
+        {
+            Id = Guid.NewGuid(),
+            UserId = userId,
+            Title = todo.Title,
+            Description = todo.Description,
+            CreatedAt = DateTimeOffset.UtcNow,
+                
+        };
+        _context.TodoItems.Add(createTodo);
         await _context.SaveChangesAsync();
 
-        return CreatedAtAction(nameof(GetById), new { id = todo.Id }, todo);
+        return CreatedAtAction(nameof(GetById), new { id = createTodo.Id }, todo);
     }
 
     // PUT: api/todo/{id}
     [HttpPut("{id:guid}")]
-    public async Task<IActionResult> Update(Guid id, TodoItem updated)
+    public async Task<IActionResult> Update(Guid id, UpdateTodoDto updated)
     {
         var userId = GetUserId();
         var todo = await _context.TodoItems

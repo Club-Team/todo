@@ -11,5 +11,8 @@ public class AppDbContext : DbContext
 
     public DbSet<TodoItem> TodoItems => Set<TodoItem>();
     public DbSet<UserProfile> UserProfiles => Set<UserProfile>();
+    public DbSet<AppUser> Users => Set<AppUser>();
+    public DbSet<OtpEntry> Otps => Set<OtpEntry>();
+
 
 }

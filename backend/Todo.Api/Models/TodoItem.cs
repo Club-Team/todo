@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 public class TodoItem
 {
     [Key]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; }
 
     [Required, MaxLength(200)]
     public string Title { get; set; } = null!;

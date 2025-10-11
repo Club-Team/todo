@@ -1,185 +1,123 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Configuration;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
+using Todo.Api.Auth;
+using Todo.Api.Data;
 using Todo.Api.Models;
 
-namespace Todo.Api.Controllers;
-
 [ApiController]
-[Route("api/[controller]")]
+[Route("auth")]
 public class AuthController : ControllerBase
 {
-    private readonly IConfiguration _config;
-    private readonly IHttpClientFactory _clientFactory;
-    private readonly ILogger<AuthController> _logger;
+    private readonly KeycloakService _kc;
+    private readonly OtpService _otp;
+    private readonly AppDbContext _db;
+    public AuthController(KeycloakService kc, OtpService otp, AppDbContext db) { _kc = kc; _otp = otp; _db = db; }
 
-    public AuthController(IConfiguration config, IHttpClientFactory clientFactory, ILogger<AuthController> logger)
+    // POST /auth/send-otp
+    [HttpPost("send-otp")]
+    public async Task<IActionResult> SendOtp([FromBody] SendOtpDto dto)
     {
-        _config = config;
-        _clientFactory = clientFactory;
-        _logger = logger;
+        var otp = await _otp.SendOtpAsync(dto.Contact);
+        // For local/dev we return OTP. Remove this in prod.
+        return Ok(new { message = "OTP sent (dev)", otp });
     }
 
-    private string Realm => _config["Keycloak:Realm"]!;
-    private string Authority => _config["Keycloak:Authority"]!;
-    private string ClientId => _config["Keycloak:ClientId"]!;
-    private string ClientSecret => _config["Keycloak:ClientSecret"]!;
-    private string AdminClientId => _config["Keycloak:AdminClientId"]!;
-    private string AdminUsername => _config["Keycloak:AdminUsername"]!;
-    private string AdminPassword => _config["Keycloak:AdminPassword"]!;
-
-    private HttpClient CreateClient()
+    // POST /auth/verify-otp  -> verifies OTP, creates Keycloak user if missing, sets temp password, returns tokens
+    [HttpPost("verify-otp")]
+    public async Task<IActionResult> VerifyOtp([FromBody] VerifyOtpDto dto)
     {
-        var client = _clientFactory.CreateClient();
-        client.BaseAddress = new Uri(Authority);
-        return client;
-    }
-
-    // 🔹 REGISTER
-    [HttpPost("register")]
-    public async Task<IActionResult> Register(RegisterRequest request)
-    {
-        if (_config.GetValue<bool>("UseFakeAuth"))
+        try
         {
-            return Ok(new { message = "User registered successfully" });
+            if (!await _otp.VerifyOtpAsync(dto.Contact, dto.Otp))
+                return BadRequest("Invalid or expired OTP");
 
-        }
-        var client = CreateClient();
+            var adminToken = await _kc.GetAdminAccessTokenAsync();
+            var username = dto.Contact;
+            var kcId = await _kc.FindUserIdByUsernameAsync(username, adminToken);
 
-        // 1️⃣ Get admin access token
-        var adminTokenResponse = await client.PostAsync(
-            $"/realms/{Realm}/protocol/openid-connect/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
+            if (kcId == null)
             {
-                ["grant_type"] = "password",
-                ["client_id"] = AdminClientId,
-                ["username"] = AdminUsername,
-                ["password"] = AdminPassword
-            })
-        );
+                string email = dto.Contact.Contains("@") ? dto.Contact : null;
+                string mobile = email == null ? dto.Contact : null;
+                kcId = await _kc.CreateUserAsync(username, email, mobile, adminToken);
 
-        if (!adminTokenResponse.IsSuccessStatusCode)
-            return StatusCode((int)adminTokenResponse.StatusCode, "Failed to get admin token");
-
-        var adminJson = await adminTokenResponse.Content.ReadAsStringAsync();
-        var adminData = JsonSerializer.Deserialize<JsonElement>(adminJson);
-        var adminToken = adminData.GetProperty("access_token").GetString();
-
-        // 2️⃣ Create user in Keycloak
-        var userPayload = new
-        {
-            username = request.Username,
-            email = request.Email,
-            firstName = request.FirstName,
-            lastName = request.LastName,
-            enabled = true,
-            credentials = new[]
-            {
-                new { type = "password", value = request.Password, temporary = false }
+                var appUser = new AppUser
+                {
+                    Id = Guid.NewGuid(),
+                    KeycloakId = kcId,
+                    Username = mobile ?? email,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _db.Users.Add(appUser);
+                await _db.SaveChangesAsync();
             }
-        };
 
-        var jsonContent = new StringContent(JsonSerializer.Serialize(userPayload), Encoding.UTF8, "application/json");
-        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", adminToken);
+            // 1. Clear any required actions
+            await _kc.ClearRequiredActionsAsync(kcId, adminToken);
 
-        var createUserResponse = await client.PostAsync($"/admin/realms/{Realm}/users", jsonContent);
+            // 2. Set a temporary password (use temporary=false if you want token immediately)
+            var tempPassword = "P@" + Guid.NewGuid().ToString("N").Substring(0, 12);
+            await _kc.SetUserPasswordAsync(kcId, tempPassword, adminToken, temporary: false);
+            await _kc.ForceEnableUserAsync(kcId, adminToken);
+            await _kc.ActivateUserAsync(kcId, adminToken); // <-- ensures account is fully active
 
-        if (!createUserResponse.IsSuccessStatusCode)
-        {
-            var error = await createUserResponse.Content.ReadAsStringAsync();
-            return StatusCode((int)createUserResponse.StatusCode, error);
+            // 3. Get tokens
+            var tokens = await _kc.GetTokenForUserAsync(username, tempPassword);
+
+            return Ok(tokens.ToString());
         }
+        catch (Exception e)
+        {
+            return BadRequest(e.Message);
 
-        return Ok(new { message = "User registered successfully" });
+        }
     }
 
-    // 🔹 LOGIN
+
+    // POST /auth/register -> register with password
+    [HttpPost("register")]
+    public async Task<IActionResult> Register([FromBody] RegisterDto dto)
+    {
+        var adminToken = await _kc.GetAdminAccessTokenAsync();
+        var username = dto.Email ?? dto.Mobile;
+        var existing = await _kc.FindUserIdByUsernameAsync(username, adminToken);
+        if (existing != null) return Conflict("User already exists");
+
+        var kcId = await _kc.CreateUserAsync(username, dto.Email, dto.Mobile, adminToken);
+        await _kc.SetUserPasswordAsync(kcId, dto.Password, adminToken, false);
+
+        var appUser = new AppUser { Id = Guid.NewGuid(), KeycloakId = kcId, Username = dto.Mobile, CreatedAt = DateTime.UtcNow };
+        _db.Users.Add(appUser);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(Register), new { id = appUser.Id }, new { success = true });
+    }
+
+    // POST /auth/login -> username (email/mobile) + password
     [HttpPost("login")]
-    public async Task<IActionResult> Login(LoginRequest request)
+    public async Task<IActionResult> Login([FromBody] LoginDto dto)
     {
-        if (_config.GetValue<bool>("UseFakeAuth"))
-        {
-            return Ok(new TokenResponse
-            {
-                AccessToken = "FAKE_TOKEN",
-                RefreshToken = "FAKE_REFRESH",
-                ExpiresIn = 3600,
-                TokenType = "bearer"
-            });
-        }
-        
-        var client = CreateClient();
-
-        var response = await client.PostAsync(
-            $"/realms/{Realm}/protocol/openid-connect/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "password",
-                ["client_id"] = ClientId,
-                ["client_secret"] = ClientSecret,
-                ["username"] = request.Username,
-                ["password"] = request.Password
-            })
-        );
-
-        var body = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-            return StatusCode((int)response.StatusCode, body);
-
-        var data = JsonSerializer.Deserialize<JsonElement>(body);
-        var tokenResponse = new TokenResponse
-        {
-            AccessToken = data.GetProperty("access_token").GetString()!,
-            RefreshToken = data.GetProperty("refresh_token").GetString()!,
-            ExpiresIn = data.GetProperty("expires_in").GetInt32(),
-            TokenType = data.GetProperty("token_type").GetString()!
-        };
-
-        return Ok(tokenResponse);
+        var tokenJson = await _kc.GetTokenForUserAsync(dto.Username, dto.Password);
+        return Ok(tokenJson.ToString());
     }
 
-    // 🔹 REFRESH TOKEN
+    // POST /auth/refresh
     [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh(RefreshRequest request)
+    public async Task<IActionResult> Refresh([FromBody] RefreshDto dto)
     {
-        if (_config.GetValue<bool>("UseFakeAuth"))
-        {
-            return Ok(new TokenResponse
-            {
-                AccessToken = "FAKE_TOKEN",
-                RefreshToken = "FAKE_REFRESH",
-                ExpiresIn = 3600,
-                TokenType = "bearer"
-            });
-        }
-        var client = CreateClient();
+        var j = await _kc.RefreshTokenAsync(dto.RefreshToken);
+        return Ok(j.ToString());
+    }
 
-        var response = await client.PostAsync(
-            $"/realms/{Realm}/protocol/openid-connect/token",
-            new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["grant_type"] = "refresh_token",
-                ["client_id"] = ClientId,
-                ["client_secret"] = ClientSecret,
-                ["refresh_token"] = request.RefreshToken
-            })
-        );
-
-        var body = await response.Content.ReadAsStringAsync();
-        if (!response.IsSuccessStatusCode)
-            return StatusCode((int)response.StatusCode, body);
-
-        var data = JsonSerializer.Deserialize<JsonElement>(body);
-        var tokenResponse = new TokenResponse
-        {
-            AccessToken = data.GetProperty("access_token").GetString()!,
-            RefreshToken = data.GetProperty("refresh_token").GetString()!,
-            ExpiresIn = data.GetProperty("expires_in").GetInt32(),
-            TokenType = data.GetProperty("token_type").GetString()!
-        };
-
-        return Ok(tokenResponse);
+    // GET /auth/me (example protected endpoint)
+    [Authorize]
+    [HttpGet("me")]
+    public IActionResult Me()
+    {
+        var preferred_username = User.Identity.Name; // gives preferred_username
+        var kcId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var localUser = _db.Users.SingleOrDefault(u => u.KeycloakId == kcId);
+        return Ok(new { keycloakId = kcId, email  = preferred_username,  localUser });
     }
 }
