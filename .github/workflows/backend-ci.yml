@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'backend/Todo.Api/**'
+      - 'backend/**'
 
 jobs:
   build:
@@ -41,6 +41,7 @@ jobs:
           file: backend/Dockerfile
           context: backend
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/todo-backend:${{ env.BACKEND_VERSION }}
             ${{ secrets.DOCKER_USERNAME }}/todo-backend:latest

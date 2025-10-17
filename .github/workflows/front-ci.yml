@@ -41,6 +41,7 @@ jobs:
           file: frontend/Dockerfile
           context: frontend
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: |
             ${{ secrets.DOCKER_USERNAME }}/todo-frontend:${{ env.FRONTEND_VERSION }}
             ${{ secrets.DOCKER_USERNAME }}/todo-frontend:latest
